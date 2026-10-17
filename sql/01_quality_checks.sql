@@ -19,6 +19,7 @@ UNION ALL SELECT 'sellers: distinct seller_id', COUNT(DISTINCT seller_id) FROM r
 UNION ALL SELECT 'geolocation: rows', COUNT(*) FROM raw.geolocation
 UNION ALL SELECT 'geolocation: distinct zip prefix', COUNT(DISTINCT geolocation_zip_code_prefix) FROM raw.geolocation;
 
+
 -- 2. Orphan keys
 SELECT 'orders without a customer' AS check_name, COUNT(*) AS result
 FROM raw.orders o LEFT JOIN raw.customers c ON c.customer_id = o.customer_id
@@ -88,3 +89,25 @@ SELECT
   COUNT(*) FILTER (WHERE delivered < purchased) AS delivered_before_purchase,
   COUNT(*) FILTER (WHERE estimated < purchased) AS estimated_before_purchase
 FROM o;
+
+
+-- Q5: Value checks
+SELECT 'order_items: price <= 0' AS check_name, COUNT(*) AS result FROM raw.order_items WHERE price::numeric <= 0
+UNION ALL SELECT 'order_items: freight_value < 0', COUNT(*) FROM raw.order_items WHERE freight_value::numeric < 0
+UNION ALL SELECT 'order_items: freight_value = 0', COUNT(*) FROM raw.order_items WHERE freight_value::numeric = 0
+UNION ALL SELECT 'order_payments: payment_value = 0', COUNT(*) FROM raw.order_payments WHERE payment_value::numeric = 0
+UNION ALL SELECT 'order_payments: installments = 0', COUNT(*) FROM raw.order_payments WHERE payment_installments::int = 0
+UNION ALL SELECT 'order_payments: type not_defined', COUNT(*) FROM raw.order_payments WHERE payment_type = 'not_defined'
+UNION ALL SELECT 'order_reviews: score outside 1-5', COUNT(*) FROM raw.order_reviews WHERE review_score::int NOT BETWEEN 1 AND 5
+UNION ALL SELECT 'products: missing category', COUNT(*) FROM raw.products WHERE product_category_name IS NULL OR product_category_name = ''
+UNION ALL SELECT 'products: category missing from translation table', COUNT(*)
+FROM raw.products p LEFT JOIN raw.product_category_name_translation t ON t.product_category_name = p.product_category_name
+WHERE p.product_category_name IS NOT NULL AND p.product_category_name <> '' AND t.product_category_name IS NULL;
+
+
+-- Q6: Coverage by month
+SELECT date_trunc('month', NULLIF(order_purchase_timestamp,'')::timestamp)::date AS month,
+       COUNT(*) AS orders
+FROM raw.orders
+GROUP BY 1
+ORDER BY 1;
